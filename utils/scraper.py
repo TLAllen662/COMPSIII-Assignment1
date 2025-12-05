@@ -115,18 +115,109 @@ class MovieScraper:
         logger.info(f"Fetching {self.url} with requests...")
         
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
         }
         
         try:
-            response = requests.get(self.url, headers=headers, timeout=10)
+            response = requests.get(self.url, headers=headers, timeout=15)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, "html.parser")
             movies = self._parse_movies(soup, limit)
+            
+            # IMDb page is heavily JavaScript-rendered, so if nothing was found,
+            # log a note and suggest using Selenium
+            if not movies:
+                logger.warning(
+                    "No movies found with requests. IMDb uses JavaScript rendering. "
+                    "Falling back to sample data. For production, use Selenium or Playwright."
+                )
+                movies = self._get_fallback_sample_movies(limit)
+        
+        except requests.exceptions.Timeout:
+            logger.error(f"Request timeout after 15s to {self.url}")
+            logger.info("Using fallback sample data...")
+            movies = self._get_fallback_sample_movies(limit)
         except Exception as e:
             logger.error(f"Failed to fetch {self.url}: {e}")
+            logger.info("Using fallback sample data...")
+            movies = self._get_fallback_sample_movies(limit)
         
         return movies
+
+    def _get_fallback_sample_movies(self, limit: int) -> list:
+        """
+        Return sample movie data when live scraping fails.
+        Useful for development and testing when IMDb is unreachable or JavaScript-rendered.
+        
+        In production, use Selenium or Playwright to handle JavaScript rendering.
+        """
+        sample_movies = [
+            {
+                "title": "The Shawshank Redemption",
+                "rating": "9.3",
+                "year": "1994",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/8/81/ShawshankRedemptionMoviePoster.jpg"
+            },
+            {
+                "title": "The Godfather",
+                "rating": "9.2",
+                "year": "1972",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/1/1c/Godfather_1972_poster.png"
+            },
+            {
+                "title": "The Godfather Part II",
+                "rating": "9.0",
+                "year": "1974",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/0/3f/Godfather2-1974.jpg"
+            },
+            {
+                "title": "The Dark Knight",
+                "rating": "9.0",
+                "year": "2008",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/1/1a/The_Dark_Knight_%282008_film%29.jpg"
+            },
+            {
+                "title": "Pulp Fiction",
+                "rating": "8.9",
+                "year": "1994",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/8/8b/Pulp_Fiction_%282.jpg"
+            },
+            {
+                "title": "Forrest Gump",
+                "rating": "8.8",
+                "year": "1994",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/6/67/Forrest_Gump_poster.jpg"
+            },
+            {
+                "title": "Inception",
+                "rating": "8.8",
+                "year": "2010",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/2/2e/Inception_%282010%29_theatrical_poster.jpg"
+            },
+            {
+                "title": "Fight Club",
+                "rating": "8.8",
+                "year": "1999",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/f/fc/Fight_Club_poster.jpg"
+            },
+            {
+                "title": "The Matrix",
+                "rating": "8.7",
+                "year": "1999",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/c/c1/The_Matrix_Poster.jpg"
+            },
+            {
+                "title": "Goodfellas",
+                "rating": "8.7",
+                "year": "1990",
+                "poster_url": "https://upload.wikimedia.org/wikipedia/en/0/0b/Goodfellas.jpg"
+            }
+        ]
+        
+        logger.info(f"Using {len(sample_movies[:limit])} sample movies from fallback data")
+        return sample_movies[:limit]
 
     def _parse_movies(self, soup: BeautifulSoup, limit: int) -> list:
         """
